@@ -1,0 +1,28 @@
+task:
+  name: "Update Runner Image ($MACOS_VERSION)"
+  execution_lock: runner-image-update
+  env:
+    matrix:
+      - MACOS_VERSION: sonoma
+        XCODE_VERSIONS: "16.1,16,15.4,15.3,15.2,15.1,\"15.0.1\""
+        DISK_SIZE: 375
+      - MACOS_VERSION: sequoia
+        XCODE_VERSIONS: "16.2,\"16.3-beta-2\",16.1,16,15.4"
+        ADDITIONAL_IOS_BUILDS: "18.2"
+        DISK_SIZE: 375
+  <<: *defaults
+  pull_base_script:
+    - tart pull ghcr.io/khulnasoft/macos-$MACOS_VERSION-base:latest
+  init_xcode_script: packer init templates/xcode.pkr.hcl
+  build_xcode_script: |
+      packer build -var tag=runner -var disk_size=$DISK_SIZE \
+        -var disk_free_mb=100000 \
+        -var macos_version="$MACOS_VERSION" \
+        -var xcode_version="[$XCODE_VERSIONS]" \
+        -var additional_ios_builds="[$ADDITIONAL_IOS_BUILDS]" \
+        templates/xcode.pkr.hcl
+  push_script: |
+    tart push "$MACOS_VERSION-xcode:runner" ghcr.io/khulnasoft/macos-runner:$MACOS_VERSION
+  always:
+    cleanup_script:
+      - tart delete "$MACOS_VERSION-xcode:runner"
